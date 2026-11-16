@@ -22,14 +22,25 @@
 </div>
 
 <h3>データ <span class="muted">({{ data.total }} 行)</span></h3>
+{# 並べ替え状態を保ったままクエリ文字列を作る #}
+{% macro qs(page, sort, desc) -%}
+  {%- set params = {"page": page, "per_page": data.per_page} -%}
+  {%- if sort -%}{%- set _ = params.update({"sort": sort, "order": "desc" if desc else "asc"}) -%}{%- endif -%}
+  ?{{ params | urlencode }}
+{%- endmacro %}
+{# 見出しクリック: 同じ列なら昇順→降順を切り替え、別の列なら昇順。1 ページ目に戻す #}
+{% macro sort_link(c) -%}
+  {{ qs(1, c, data.sort == c and not data.desc) }}
+{%- endmacro %}
 {% macro pager() %}
 <div class="pager">
-  {% if data.page > 1 %}<a href="?page={{ data.page - 1 }}&per_page={{ data.per_page }}">← 前へ</a>{% else %}<span class="muted">← 前へ</span>{% endif %}
+  {% if data.page > 1 %}<a href="{{ qs(data.page - 1, data.sort, data.desc) }}">← 前へ</a>{% else %}<span class="muted">← 前へ</span>{% endif %}
   <span>{{ data.page }} / {{ data.pages }} ページ</span>
-  {% if data.page < data.pages %}<a href="?page={{ data.page + 1 }}&per_page={{ data.per_page }}">次へ →</a>{% else %}<span class="muted">次へ →</span>{% endif %}
+  {% if data.page < data.pages %}<a href="{{ qs(data.page + 1, data.sort, data.desc) }}">次へ →</a>{% else %}<span class="muted">次へ →</span>{% endif %}
+  {% if data.sort %}<a href="{{ qs(1, none, false) }}" class="muted">並べ替えを解除</a>{% endif %}
 </div>
 {% endmacro %}
 {{ pager() }}
-{% with columns = data.columns, rows = data.rows %}{% include "_rows.html" %}{% endwith %}
+{% with columns = data.columns, rows = data.rows, sortable = true %}{% include "_rows.html" %}{% endwith %}
 {{ pager() }}
 {% endblock %}

@@ -1,6 +1,14 @@
 <div class="scroll">
 <table>
-  <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+  <thead><tr>
+  {% for c in columns %}
+    {% if sortable %}
+    <th{% if data.sort == c %} aria-sort="{{ 'descending' if data.desc else 'ascending' }}"{% endif %}>
+      <a class="sort" href="{{ sort_link(c) }}">{{ c }}<span class="arrow">{% if data.sort == c %}{{ "▼" if data.desc else "▲" }}{% endif %}</span></a>
+    </th>
+    {% else %}<th>{{ c }}</th>{% endif %}
+  {% endfor %}
+  </tr></thead>
   <tbody>
   {% for row in rows %}
   <tr>

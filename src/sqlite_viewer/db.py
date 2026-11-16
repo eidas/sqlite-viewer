@@ -24,6 +24,8 @@ class Page:
     total: int
     page: int
     per_page: int
+    sort: str | None = None
+    desc: bool = False
 
     @property
     def pages(self) -> int:
@@ -38,6 +40,10 @@ class QueryResult:
 
 
 class TableNotFoundError(Exception):
+    pass
+
+
+class ColumnNotFoundError(Exception):
     pass
 
 
@@ -100,20 +106,39 @@ class Database:
             for r in rows
         ]
 
-    def rows(self, table: str, page: int = 1, per_page: int = 50) -> Page:
+    def rows(
+        self,
+        table: str,
+        page: int = 1,
+        per_page: int = 50,
+        sort: str | None = None,
+        desc: bool = False,
+    ) -> Page:
         self._check(table)
         page = max(1, page)
         q = _quote(table)
+        order_by = ""
+        if sort is not None:
+            # カラム名は実在するものだけを受け付け、クォートして埋め込む
+            if sort not in [c.name for c in self.columns(table)]:
+                raise ColumnNotFoundError(sort)
+            order_by = f" ORDER BY {_quote(sort)} {'DESC' if desc else 'ASC'}"
         with self.connect() as conn:
             total = conn.execute(f"SELECT COUNT(*) FROM {q}").fetchone()[0]
             cur = conn.execute(
-                f"SELECT * FROM {q} LIMIT ? OFFSET ?",
+                f"SELECT * FROM {q}{order_by} LIMIT ? OFFSET ?",
                 (per_page, (page - 1) * per_page),
             )
             columns = [d[0] for d in cur.description]
             rows = cur.fetchall()
         return Page(
-            columns=columns, rows=rows, total=total, page=page, per_page=per_page
+            columns=columns,
+            rows=rows,
+            total=total,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+            desc=desc,
         )
 
     def query(
