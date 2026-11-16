@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>テーブル一覧</h2>
+{% if tables %}
+<p class="muted">{{ tables | length }} 個のテーブル / ビュー。左のリストから選んでください。</p>
+{% else %}
+<p class="muted">テーブルがありません。</p>
+{% endif %}
+{% endblock %}

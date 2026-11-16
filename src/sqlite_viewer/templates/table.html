@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ table }} - SQLite Viewer{% endblock %}
+{% block content %}
+<h2>{{ table }}</h2>
+
+<h3>スキーマ</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>カラム</th><th>型</th><th>NOT NULL</th><th>デフォルト</th><th>PK</th></tr></thead>
+  <tbody>
+  {% for c in columns %}
+  <tr>
+    <td>{{ c.name }}</td>
+    <td>{{ c.type }}</td>
+    <td>{{ "○" if c.notnull else "" }}</td>
+    <td>{{ c.default if c.default is not none else "" }}</td>
+    <td>{{ "○" if c.pk else "" }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h3>データ <span class="muted">({{ data.total }} 行)</span></h3>
+{% macro pager() %}
+<div class="pager">
+  {% if data.page > 1 %}<a href="?page={{ data.page - 1 }}&per_page={{ data.per_page }}">← 前へ</a>{% else %}<span class="muted">← 前へ</span>{% endif %}
+  <span>{{ data.page }} / {{ data.pages }} ページ</span>
+  {% if data.page < data.pages %}<a href="?page={{ data.page + 1 }}&per_page={{ data.per_page }}">次へ →</a>{% else %}<span class="muted">次へ →</span>{% endif %}
+</div>
+{% endmacro %}
+{{ pager() }}
+{% with columns = data.columns, rows = data.rows %}{% include "_rows.html" %}{% endwith %}
+{{ pager() }}
+{% endblock %}

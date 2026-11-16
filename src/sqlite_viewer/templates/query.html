@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}SQL 実行 - SQLite Viewer{% endblock %}
+{% block content %}
+<h2>SQL 実行</h2>
+<form method="get" action="/query" id="query-form">
+  <textarea name="sql" rows="6" spellcheck="false" placeholder="SELECT * FROM ...">{{ sql }}</textarea>
+  <div class="actions">
+    <button type="submit">実行</button>
+    <span class="muted">Ctrl+Enter でも実行できます。データベースは読み取り専用です。</span>
+  </div>
+</form>
+<script>
+  document.querySelector("#query-form textarea").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.target.form.requestSubmit();
+    }
+  });
+</script>
+
+{% if error %}
+<div class="error">{{ error }}</div>
+{% elif result %}
+  {% if result.columns %}
+  <p class="muted">
+    {{ result.rows | length }} 行
+    {% if result.truncated %}（先頭 {{ result.rows | length }} 行のみ表示。LIMIT で絞り込んでください）{% endif %}
+  </p>
+  {% with columns = result.columns, rows = result.rows %}{% include "_rows.html" %}{% endwith %}
+  {% else %}
+  <p class="muted">結果を返さない文が実行されました。</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

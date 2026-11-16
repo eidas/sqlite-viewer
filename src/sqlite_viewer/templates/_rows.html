@@ -1,0 +1,16 @@
+<div class="scroll">
+<table>
+  <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    {% for v in row %}
+      {% if v is none %}<td class="null">NULL</td>
+      {% elif v is instanceof_bytes %}<td class="null">BLOB ({{ v | length }} bytes)</td>
+      {% else %}<td title="{{ v }}">{{ v }}</td>{% endif %}
+    {% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
