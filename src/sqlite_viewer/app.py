@@ -31,6 +31,7 @@ def create_app(db_path: str | Path) -> FastAPI:
         per_page: int = Query(50, ge=1, le=1000),
         sort: str | None = None,
         order: Literal["asc", "desc"] = "asc",
+        q: str = "",
     ):
         try:
             columns = db.columns(table)
@@ -40,6 +41,8 @@ def create_app(db_path: str | Path) -> FastAPI:
                 per_page=per_page,
                 sort=sort or None,
                 desc=order == "desc",
+                # NUL があると LIKE のパターンがそこで切れて全件一致になるため除く
+                search=q.replace("\x00", "").strip() or None,
             )
         except TableNotFoundError:
             raise HTTPException(status_code=404, detail="テーブルが見つかりません")

@@ -26,6 +26,7 @@ class Page:
     per_page: int
     sort: str | None = None
     desc: bool = False
+    search: str | None = None
 
     @property
     def pages(self) -> int:
@@ -62,6 +63,11 @@ _ALLOWED_ACTIONS = {
 
 def _read_only_authorizer(action: int, *_args) -> int:
     return sqlite3.SQLITE_OK if action in _ALLOWED_ACTIONS else sqlite3.SQLITE_DENY
+
+
+def _escape_like(text: str) -> str:
+    """LIKE のワイルドカード（% と _）を文字どおりに扱うようエスケープする。"""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _quote(name: str) -> str:
@@ -113,21 +119,35 @@ class Database:
         per_page: int = 50,
         sort: str | None = None,
         desc: bool = False,
+        search: str | None = None,
     ) -> Page:
         self._check(table)
         page = max(1, page)
         q = _quote(table)
+        names = [c.name for c in self.columns(table)]
         order_by = ""
         if sort is not None:
             # カラム名は実在するものだけを受け付け、クォートして埋め込む
-            if sort not in [c.name for c in self.columns(table)]:
+            if sort not in names:
                 raise ColumnNotFoundError(sort)
             order_by = f" ORDER BY {_quote(sort)} {'DESC' if desc else 'ASC'}"
+        where, params = "", []
+        if search:
+            # いずれかの列に部分一致する行に絞り込む（BLOB 列は対象外）
+            conds = [
+                f"(typeof({_quote(n)}) <> 'blob'"
+                f" AND CAST({_quote(n)} AS TEXT) LIKE ? ESCAPE '\\')"
+                for n in names
+            ]
+            where = " WHERE " + " OR ".join(conds)
+            params = [f"%{_escape_like(search)}%"] * len(names)
         with self.connect() as conn:
-            total = conn.execute(f"SELECT COUNT(*) FROM {q}").fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM {q}{where}", params).fetchone()[
+                0
+            ]
             cur = conn.execute(
-                f"SELECT * FROM {q}{order_by} LIMIT ? OFFSET ?",
-                (per_page, (page - 1) * per_page),
+                f"SELECT * FROM {q}{where}{order_by} LIMIT ? OFFSET ?",
+                (*params, per_page, (page - 1) * per_page),
             )
             columns = [d[0] for d in cur.description]
             rows = cur.fetchall()
@@ -139,6 +159,7 @@ class Database:
             per_page=per_page,
             sort=sort,
             desc=desc,
+            search=search or None,
         )
 
     def query(

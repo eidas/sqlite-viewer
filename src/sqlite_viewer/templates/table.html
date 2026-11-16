@@ -21,11 +21,12 @@
 </table>
 </div>
 
-<h3>データ <span class="muted">({{ data.total }} 行)</span></h3>
-{# 並べ替え状態を保ったままクエリ文字列を作る #}
-{% macro qs(page, sort, desc) -%}
+<h3>データ <span class="muted">({% if data.search %}「{{ data.search }}」に一致: {% endif %}{{ data.total }} 行)</span></h3>
+{# 並べ替え・検索の状態を保ったままクエリ文字列を作る #}
+{% macro qs(page, sort, desc, search=data.search) -%}
   {%- set params = {"page": page, "per_page": data.per_page} -%}
   {%- if sort -%}{%- set _ = params.update({"sort": sort, "order": "desc" if desc else "asc"}) -%}{%- endif -%}
+  {%- if search -%}{%- set _ = params.update({"q": search}) -%}{%- endif -%}
   ?{{ params | urlencode }}
 {%- endmacro %}
 {# 見出しクリック: 同じ列なら昇順→降順を切り替え、別の列なら昇順。1 ページ目に戻す #}
@@ -40,6 +41,16 @@
   {% if data.sort %}<a href="{{ qs(1, none, false) }}" class="muted">並べ替えを解除</a>{% endif %}
 </div>
 {% endmacro %}
+<form method="get" class="search">
+  <input type="search" name="q" value="{{ data.search or '' }}" placeholder="全列から部分一致で検索">
+  <input type="hidden" name="per_page" value="{{ data.per_page }}">
+  {% if data.sort %}
+  <input type="hidden" name="sort" value="{{ data.sort }}">
+  <input type="hidden" name="order" value="{{ 'desc' if data.desc else 'asc' }}">
+  {% endif %}
+  <button type="submit">検索</button>
+  {% if data.search %}<a href="{{ qs(1, data.sort, data.desc, none) }}">検索を解除</a>{% endif %}
+</form>
 {{ pager() }}
 {% with columns = data.columns, rows = data.rows, sortable = true %}{% include "_rows.html" %}{% endwith %}
 {{ pager() }}

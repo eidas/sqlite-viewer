@@ -76,6 +76,52 @@ def test_rows_sort_unknown_column(db_path):
         Database(db_path).rows("users", sort='id" DESC; --')
 
 
+def test_rows_search(db_path):
+    db = Database(db_path)
+    # name 列 "user1", "user10".."user19", "user100".."user119" に一致
+    page = db.rows("users", per_page=200, search="user1")
+    assert page.total == 1 + 10 + 20
+    assert page.search == "user1"
+    # 数値列（id）も文字列として検索される
+    assert db.rows("users", search="120").total == 1
+    # 大文字小文字を区別しない（ASCII）
+    assert db.rows("users", search="USER119").total == 1
+
+
+def test_rows_search_wildcards_are_literal(db_path):
+    db = Database(db_path)
+    assert db.rows("users", search="%").total == 0
+    assert db.rows("users", search="_").total == 0
+    # note 列の "<b>x</b>" に一致
+    assert db.rows("users", search="<b>").total == 60
+
+
+def test_rows_search_skips_blob(tmp_path):
+    path = tmp_path / "blob.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE files (name TEXT, body BLOB)")
+    conn.execute("INSERT INTO files VALUES ('a.txt', ?)", (b"findme",))
+    conn.commit()
+    conn.close()
+    db = Database(path)
+    assert db.rows("files", search="findme").total == 0
+    assert db.rows("files", search="a.txt").total == 1
+
+
+def test_table_page_search_ignores_nul(client):
+    # LIKE は NUL で打ち切られて全件一致になるため、NUL は取り除く
+    res = client.get("/tables/users", params={"q": "user119\x00"})
+    assert "「user119」に一致: 1 行" in res.text
+
+
+def test_rows_search_with_sort_and_page(db_path):
+    page = Database(db_path).rows(
+        "users", page=2, per_page=5, sort="id", desc=True, search="user1"
+    )
+    assert page.total == 31
+    assert [r[0] for r in page.rows] == [115, 114, 113, 112, 111]
+
+
 def test_unknown_table(db_path):
     with pytest.raises(TableNotFoundError):
         Database(db_path).rows("users; DROP TABLE users")
@@ -126,6 +172,33 @@ def test_table_page_sort_bad_params(client):
     assert client.get("/tables/users", params={"sort": "nope"}).status_code == 400
     res = client.get("/tables/users", params={"sort": "id", "order": "x"})
     assert res.status_code == 422
+
+
+def test_table_page_search(client):
+    res = client.get(
+        "/tables/users",
+        params={"q": "user1", "sort": "id", "order": "desc", "per_page": 5},
+    )
+    assert res.status_code == 200
+    assert "「user1」に一致: 31 行" in res.text
+    assert 'value="user1"' in res.text
+    # ページ送り・見出しリンクが検索語を引き継ぐ
+    assert 'href="?page=2&amp;per_page=5&amp;sort=id&amp;order=desc&amp;q=user1"' in (
+        res.text
+    )
+    assert 'href="?page=1&amp;per_page=5&amp;sort=id&amp;order=asc&amp;q=user1"' in (
+        res.text
+    )
+    # 検索解除リンクは検索語を外し、並べ替えは残す
+    assert 'href="?page=1&amp;per_page=5&amp;sort=id&amp;order=desc">検索を解除' in (
+        res.text
+    )
+
+
+def test_table_page_search_escaped(client):
+    res = client.get("/tables/users", params={"q": '"><script>'})
+    assert res.status_code == 200
+    assert "<script>" not in res.text
 
 
 def test_table_with_quotes_in_name(client):
