@@ -34,6 +34,14 @@
     th .arrow { display: inline-block; width: 1.2em; font-size: 10px; color: var(--accent); }
     form.search { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; font-size: 14px; }
     form.search input[type=search] { flex: 0 1 320px; padding: 6px 8px; font-size: 14px; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+    form.open { display: flex; gap: 8px; margin: 0 0 8px; }
+    form.open input[type=text] { flex: 1; max-width: 640px; padding: 6px 8px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+    ul.recent { list-style: none; padding: 0; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+    ul.recent li { margin: 4px 0; }
+    ul.recent form { display: inline; }
+    button.link { background: none; padding: 0; color: var(--accent); font: inherit; text-align: left; word-break: break-all; }
+    button.link:hover:not(:disabled) { text-decoration: underline; }
+    button.link:disabled { color: var(--fg); cursor: default; }
     nav ul.tools { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
     textarea { width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 13px; padding: 8px; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
     .actions { display: flex; gap: 12px; align-items: center; margin: 8px 0 16px; font-size: 13px; }
@@ -44,9 +52,10 @@
 <body>
   <nav>
     <h1><a href="/">SQLite Viewer</a></h1>
-    <div class="path">{{ db.path }}</div>
+    {% if db %}<div class="path">{{ db.path }}</div>{% endif %}
     <ul class="tools">
-      <li><a href="/query" {% if sql is defined %}class="active"{% endif %}>SQL 実行</a></li>
+      <li><a href="/open" {% if recent is defined %}class="active"{% endif %}>DB を開く / 切り替え</a></li>
+      {% if db %}<li><a href="/query" {% if sql is defined %}class="active"{% endif %}>SQL 実行</a></li>{% endif %}
     </ul>
     <ul>
       {% for t in tables %}

@@ -44,6 +44,13 @@ class TableNotFoundError(Exception):
     pass
 
 
+SQLITE_HEADER = b"SQLite format 3\x00"
+
+
+class NotSQLiteError(Exception):
+    pass
+
+
 class ColumnNotFoundError(Exception):
     pass
 
@@ -80,6 +87,11 @@ class Database:
         self.path = Path(path).resolve()
         if not self.path.is_file():
             raise FileNotFoundError(self.path)
+        # 空ファイルは空の DB として扱えるので許可する
+        with self.path.open("rb") as f:
+            header = f.read(len(SQLITE_HEADER))
+        if header and header != SQLITE_HEADER:
+            raise NotSQLiteError(self.path)
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

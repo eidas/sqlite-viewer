@@ -7,6 +7,7 @@ from sqlite_viewer.app import create_app
 from sqlite_viewer.db import (
     ColumnNotFoundError,
     Database,
+    NotSQLiteError,
     QueryError,
     TableNotFoundError,
 )
@@ -267,6 +268,92 @@ def test_query_page_empty(client):
     res = client.get("/query")
     assert res.status_code == 200
     assert "<textarea" in res.text
+
+
+def test_not_sqlite_file(tmp_path):
+    path = tmp_path / "text.txt"
+    path.write_text("hello, this is not a database")
+    with pytest.raises(NotSQLiteError):
+        Database(path)
+
+
+def test_empty_file_is_empty_db(tmp_path):
+    path = tmp_path / "empty.db"
+    path.touch()
+    assert Database(path).tables() == []
+
+
+@pytest.fixture
+def other_db(tmp_path):
+    path = tmp_path / "other.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE products (id INTEGER, title TEXT)")
+    conn.commit()
+    conn.close()
+    return path
+
+
+def test_start_without_db_redirects_to_open(tmp_path):
+    client = TestClient(create_app())
+    for url in ["/", "/query", "/tables/users"]:
+        res = client.get(url, follow_redirects=False)
+        assert res.status_code == 303
+        assert res.headers["location"] == "/open"
+    res = client.get("/open")
+    assert res.status_code == 200
+    assert "データベースを開く" in res.text
+    # DB 未選択時は SQL 実行のリンクを出さない
+    assert 'href="/query"' not in res.text
+
+
+def test_switch_db(client, db_path, other_db):
+    assert "users" in client.get("/").text
+    res = client.post("/open", data={"path": str(other_db)})
+    assert res.status_code == 200
+    assert str(res.url).endswith("/")
+    assert 'href="/tables/products"' in res.text
+    assert 'href="/tables/users"' not in res.text
+    # 最近開いたファイルに両方出て、新しい順に並ぶ
+    page = client.get("/open").text
+    assert page.index(str(other_db)) < page.index(str(db_path))
+    assert "（表示中）" in page
+
+
+def test_switch_db_strips_quotes(client, other_db):
+    res = client.post("/open", data={"path": f'  "{other_db}" '})
+    assert "products" in res.text
+
+
+def test_switch_db_errors(client, tmp_path):
+    text = tmp_path / "text.txt"
+    text.write_text("not a db")
+    cases = [
+        ("", "パスを入力してください"),
+        (str(tmp_path / "nope.db"), "ファイルが見つかりません"),
+        (str(tmp_path), "ファイルが見つかりません"),
+        (str(text), "SQLite のデータベースファイルではありません"),
+    ]
+    for path, message in cases:
+        res = client.post("/open", data={"path": path})
+        assert res.status_code == 200
+        assert message in res.text
+    # 失敗しても元の DB は開いたまま
+    assert "users" in client.get("/").text
+
+
+def test_recent_dedup_and_limit(tmp_path):
+    paths = []
+    for i in range(12):
+        p = tmp_path / f"db{i}.db"
+        p.touch()
+        paths.append(p)
+    client = TestClient(create_app())
+    for p in [*paths, paths[0]]:
+        client.post("/open", data={"path": str(p)})
+    page = client.get("/open").text
+    assert page.count('name="path" value="') == 10 + 1  # 履歴 10 件 + 入力欄
+    assert str(paths[0].resolve()) in page
+    assert str(paths[1].resolve()) not in page
 
 
 def test_table_not_found(client):

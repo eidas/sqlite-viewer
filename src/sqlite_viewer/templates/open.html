@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}DB を開く - SQLite Viewer{% endblock %}
+{% block content %}
+<h2>データベースを開く</h2>
+<form method="post" action="/open" class="open">
+  <input type="text" name="path" value="{{ path }}" placeholder="C:\path\to\database.db" autofocus spellcheck="false">
+  <button type="submit">開く</button>
+</form>
+<p class="muted">SQLite ファイルのフルパスを入力してください。エクスプローラーの「パスのコピー」で付く前後の " はそのままで構いません。</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+{% if recent %}
+<h3>最近開いたファイル</h3>
+<ul class="recent">
+  {% for p in recent %}
+  <li>
+    <form method="post" action="/open">
+      <input type="hidden" name="path" value="{{ p }}">
+      <button type="submit" class="link"{% if db and db.path == p %} disabled{% endif %}>{{ p }}</button>
+      {% if db and db.path == p %}<span class="muted">（表示中）</span>{% endif %}
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}
